@@ -126,7 +126,7 @@ If the car in front of the ego vehicle is less than 30 meters away from the ego 
             }
           }
 
-## Behavior
+### Behavior
 
 Based on the prediction of the situation we are in, this code increases the speed, decrease speed, or make a lane change when it is safe. This part decides what to do:
 -   If we have a car in front of us, do we change lanes?
@@ -161,7 +161,7 @@ Based on the prediction of the situation we are in, this code increases the spee
             }
           }
 
-## Trajectory
+### Trajectory
 This code does the calculation of the trajectory based on the speed and lane output from the behavior, car coordinates and past path points.
 
 First, the last two points of the previous trajectory (or the car position if there are no previous trajectory, codes below are used in conjunction three points at a far distance to initialize the spline calculation .
