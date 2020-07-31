@@ -4,10 +4,15 @@
 #include <math.h>
 #include <string>
 #include <vector>
+#include <map>
+#include "vehicle.h"
 
 // for convenience
 using std::string;
 using std::vector;
+using std::map;
+
+
 
 // Checks if the SocketIO event has JSON data.
 // If there is data the JSON object in string format will be returned,
@@ -154,4 +159,109 @@ vector<double> getXY(double s, double d, const vector<double> &maps_s,
   return {x,y};
 }
 
+// Helper function to Uses the current state to return a vector of possible successor states for the finite state machine.
+vector<string> successor_states(int lane, string state) {
+  // Provides the possible next states given the current state for the FSM 
+  //   discussed in the course, with the exception that lane changes happen 
+  //   instantaneously, so LCL and LCR can only transition back to KL.
+  vector<string> states;
+  states.push_back("KL");
+  if(state.compare("KL") == 0) {
+    if (lane == 1){
+      states.push_back("PLCL");
+      states.push_back("PLCR");
+    }
+    else if (lane == 0){
+      states.push_back("PLCR");
+    }
+    else if (lane == 2){
+      states.push_back("PLCL");
+    }
+  } 
+  else if (state.compare("PLCL") == 0) {
+    if (lane - 1 >= 0) {
+      states.push_back("PLCL");
+      states.push_back("LCL");
+    }
+  } 
+  else if (state.compare("PLCR") == 0) {
+    if (lane != 2) {
+      states.push_back("PLCR");
+      states.push_back("LCR");
+    }
+  }
+    
+  // If state is "LCL" or "LCR", then just return "KL"
+  return states;
+}
+
+vector<double> find_lane_speeds(vector<Vehicle> surrond_vehicles){
+  vector<double> lane_speeds = {55.0, 55.0, 55.0};
+  map<int, vector<int>> lane_vehicles;
+  for(int i = 0; i < surrond_vehicles.size(); i++){
+    // Car is in my lane
+    double d = surrond_vehicles[i].d;
+    double vx = surrond_vehicles[i].vx;
+    double vy = surrond_vehicles[i].vy;
+    double check_speed = sqrt(vx*vx + vy*vy);
+    int lane_find = -1;
+    
+    // Find which lane the vehicle is at
+    for (int lane = 0; lane < 3; lane++){
+      if ( d < (2 + 4*lane + 2) && d >= (2 + 4*lane - 2)){
+        lane_vehicles[lane].push_back(i);
+        lane_find = lane;  
+        std::cout << "check speed" << check_speed << std::endl;
+      }
+    }
+    
+    // The slowest vehicle in each lane represent the lane speed
+    if (check_speed < lane_speeds[lane_find]){
+      lane_speeds[lane_find] = check_speed;
+    }
+    
+  }
+  
+  
+  // debug
+  std::cout << "lane_speeds:" << lane_speeds[0]  << "  " << lane_speeds[1] << "  "  << lane_speeds[2] << std::endl;
+  
+  return lane_speeds;
+}
+
+double inefficiency_cost(string possible_successor_state, int cur_lane, vector<double> lane_speeds, double target_speed){
+  double intended_lane_spd;
+  double final_lane_spd;
+  if (possible_successor_state.compare("KL") == 0){
+    intended_lane_spd = lane_speeds[cur_lane];
+    final_lane_spd = lane_speeds[cur_lane];
+  }
+  else if (possible_successor_state.compare("PLCL") == 0){
+    intended_lane_spd = lane_speeds[cur_lane - 1];
+    final_lane_spd = lane_speeds[cur_lane];
+  }
+  else if (possible_successor_state.compare("PLCR") == 0){
+    intended_lane_spd = lane_speeds[cur_lane + 1];
+    final_lane_spd = lane_speeds[cur_lane];
+  }
+  else if (possible_successor_state.compare("LCR") == 0){
+    intended_lane_spd = lane_speeds[cur_lane + 1];
+    final_lane_spd = lane_speeds[cur_lane + 1];
+  }
+  else if (possible_successor_state.compare("LCL") == 0){
+    intended_lane_spd = lane_speeds[cur_lane - 1];
+    final_lane_spd = lane_speeds[cur_lane - 1];
+  }
+
+  double cost = (2.0 * target_speed - intended_lane_spd - final_lane_spd) / target_speed;
+  
+  return cost;
+}
+
+double calculate_cost(string possible_successor_state, vector<Vehicle> surrond_vehicles, int cur_lane, double target_speed){
+  vector<double> lane_speeds = find_lane_speeds(surrond_vehicles);
+  double speed_cost = inefficiency_cost(possible_successor_state, cur_lane, lane_speeds, target_speed);
+  std::cout<< "cost:" << speed_cost << std::endl;
+  return speed_cost;
+}
 #endif  // HELPERS_H
